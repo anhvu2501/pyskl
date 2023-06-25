@@ -1,5 +1,8 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from torch import linalg as LA
 from mmcv.cnn import normal_init
 
 from ..builder import HEADS
@@ -89,9 +92,10 @@ class SimpleHead(BaseHead):
         assert x.shape[1] == self.in_c
         if self.dropout is not None:
             x = self.dropout(x)
-
+            
+        # Want to use PCA to visualize here???
         cls_score = self.fc_cls(x)
-        return cls_score
+        return cls_score, x
 
 
 @HEADS.register_module()
@@ -154,3 +158,69 @@ class TSNHead(BaseHead):
                          init_std=init_std,
                          mode='2D',
                          **kwargs)
+
+@HEADS.register_module()
+class NewLossHead(SimpleHead):
+    def __init__(self, num_classes, in_channels, loss_cls=dict(type='CrossEntropyLoss'), dropout=0.5, init_std=0.01, mode='3D', **kwargs):
+        super().__init__(num_classes, in_channels, loss_cls, dropout, init_std, mode, **kwargs)
+        self.z_prior = torch.empty(num_classes, in_channels)
+        nn.init.orthogonal_(self.z_prior, gain=1)
+
+    def forward(self, x):
+        """Defines the computation performed at every call.
+
+        Args:
+            x (torch.Tensor): The input data.
+
+        Returns:
+            torch.Tensor: The classification scores for input samples.
+        """
+
+        if isinstance(x, list):
+            for item in x:
+                assert len(item.shape) == 2
+            x = [item.mean(dim=0) for item in x]
+            x = torch.stack(x)
+
+        if len(x.shape) != 2:
+            if self.mode == '2D':
+                assert len(x.shape) == 5
+                N, S, C, H, W = x.shape
+                pool = nn.AdaptiveAvgPool2d(1)
+                x = x.reshape(N * S, C, H, W)
+                x = pool(x)
+                x = x.reshape(N, S, C)
+                x = x.mean(dim=1)
+            if self.mode == '3D':
+                pool = nn.AdaptiveAvgPool3d(1)
+                if isinstance(x, tuple) or isinstance(x, list):
+                    x = torch.cat(x, dim=1)
+                x = pool(x)
+                x = x.view(x.shape[:2])
+            if self.mode == 'GCN':
+                pool = nn.AdaptiveAvgPool2d(1)
+                N, M, C, T, V = x.shape
+                x = x.reshape(N * M, C, T, V)
+
+                x = pool(x)
+                x = x.reshape(N, M, C) 
+                x = x.mean(dim=1) # N x C
+
+        assert x.shape[1] == self.in_c
+        if self.dropout is not None:
+            x = self.dropout(x)
+            
+        cls_score = self.fc_cls(x)
+        return cls_score, x
+
+    def get_mmd_loss(z, z_prior, y, num_cls):
+        y_valid = [i_cls in y for i_cls in range(num_cls)]
+        z_mean = torch.stack([z[y==i_cls].mean(dim=0) for i_cls in range(num_cls)], dim=0)
+        l2_z_mean= LA.norm(z.mean(dim=0), ord=2)
+        mmd_loss = F.mse_loss(z_mean[y_valid], z_prior[y_valid].to(z.device))
+        return mmd_loss, l2_z_mean, z_mean[y_valid]
+
+    def loss(self, cls_score, z, label, **kwargs):
+        losses = super().loss(self, cls_score, label, **kwargs)
+        losses['loss_cls'] += self.get_mmd_loss(z, self.z_prior, label, self.num_classes)
+        return losses
