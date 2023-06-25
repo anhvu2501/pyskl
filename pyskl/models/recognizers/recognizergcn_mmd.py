@@ -62,7 +62,7 @@ class RecognizerMMDLoss(BaseRecognizer):
                 x = x[None]
             return x.data.cpu().numpy().astype(np.float16)
 
-        cls_score = self.cls_head(x)
+        cls_score, _ = self.cls_head(x)
         cls_score = cls_score.reshape(bs, nc, cls_score.shape[-1])
         # harmless patch
         if 'average_clips' not in self.test_cfg:
