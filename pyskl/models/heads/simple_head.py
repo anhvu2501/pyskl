@@ -161,7 +161,7 @@ class TSNHead(BaseHead):
 
 @HEADS.register_module()
 class NewLossHead(SimpleHead):
-    def __init__(self, num_classes, in_channels, loss_cls=dict(type='CrossEntropyLoss'), dropout=0.5, init_std=0.01, mode='3D', **kwargs):
+    def __init__(self, num_classes, in_channels, loss_cls=dict(type='CrossEntropyLoss'), dropout=0., init_std=0.01, mode='GCN', **kwargs):
         super().__init__(num_classes, in_channels, loss_cls, dropout, init_std, mode, **kwargs)
         self.z_prior = torch.empty(num_classes, in_channels)
         nn.init.orthogonal_(self.z_prior, gain=1)
