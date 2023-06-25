@@ -3,7 +3,7 @@ model = dict(
     backbone=dict(
         type='STGCN',
         graph_cfg=dict(layout='nturgb+d', mode='stgcn_spatial')),
-    cls_head=dict(type='GCNHead', num_classes=60, in_channels=256))
+    cls_head=dict(type='NewLossHead', num_classes=60, in_channels=256))
 
 dataset_type = 'PoseDataset'
 ann_file = 'data/nturgbd/ntu60_3danno.pkl'
