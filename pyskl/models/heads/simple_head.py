@@ -213,7 +213,7 @@ class NewLossHead(SimpleHead):
         cls_score = self.fc_cls(x)
         return cls_score, x
 
-    def get_mmd_loss(z, z_prior, y, num_cls):
+    def get_mmd_loss(self, z, z_prior, y, num_cls):
         y_valid = [i_cls in y for i_cls in range(num_cls)]
         z_mean = torch.stack([z[y==i_cls].mean(dim=0) for i_cls in range(num_cls)], dim=0)
         l2_z_mean= LA.norm(z.mean(dim=0), ord=2)
@@ -221,6 +221,7 @@ class NewLossHead(SimpleHead):
         return mmd_loss, l2_z_mean, z_mean[y_valid]
 
     def loss(self, cls_score, z, label, **kwargs):
-        losses = super().loss(self, cls_score, label, **kwargs)
-        losses['loss_cls'] += self.get_mmd_loss(z, self.z_prior, label, self.num_classes)
+        losses = super().loss(cls_score, label, **kwargs)
+        mmd_loss, l2_z_mean, _ = self.get_mmd_loss(z, self.z_prior, label, self.num_classes)
+        losses['loss_cls'] += mmd_loss * 1e-1 + l2_z_mean * 1e-4
         return losses

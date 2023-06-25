@@ -1,5 +1,5 @@
 model = dict(
-    type='RecognizerGCN',
+    type='RecognizerMMDLoss',
     backbone=dict(
         type='STGCN',
         graph_cfg=dict(layout='nturgb+d', mode='stgcn_spatial')),
