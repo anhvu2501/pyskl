@@ -1,16 +1,14 @@
 model = dict(
-    type='RecognizerMMDLoss',
+    type='RecognizerGCN',
     backbone=dict(
         type='STGCN',
         graph_cfg=dict(layout='nturgb+d', mode='stgcn_spatial')),
-    cls_head=dict(type='NewLossHead', num_classes=120, in_channels=256))
+    cls_head=dict(type='GCNHead', num_classes=120, in_channels=256))
 
 dataset_type = 'PoseDataset'
 ann_file = 'data/nturgbd/ntu120_3danno.pkl'
 train_pipeline = [
     dict(type='PreNormalize3D'),
-    dict(type='RandomScale', scale=0.1), 
-    dict(type='RandomRot'),
     dict(type='GenSkeFeat', dataset='nturgb+d', feats=['j']),
     dict(type='UniformSample', clip_len=100),
     dict(type='PoseDecode'),
